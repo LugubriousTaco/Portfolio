@@ -1,4 +1,4 @@
-# SQL Analysis
+# Rockbuster Stealth Analysis
 This repository contains a collection of analytical work using SQL in the pgAdmin platform, as part of the CareerFoundry course.
 
 ## Objective
