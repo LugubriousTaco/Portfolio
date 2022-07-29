@@ -1,0 +1,153 @@
+# SQL Queries
+
+## Data Cleaning
+
+-- Checking for duplicate records within the film and customer tables
+
+SELECT title, rental_rate, release_year, rating, replacement_cost, COUNT(*)
+FROM film
+GROUP BY title, rental_rate, release_year, rating, replacement_cost
+HAVING COUNT (*) > 1
+
+SELECT customer_id, address_id, COUNT(*) FROM customer
+GROUP BY customer_id, address_id
+HAVING COUNT(*) > 1
+
+-- Checking for missing values within film and customer tables
+
+SELECT 	COUNT(title), 
+	COUNT(rating), 
+	COUNT(description), 
+	COUNT(rental_rate), 
+	COUNT(*) 
+FROM film
+
+SELECT 	COUNT(email), 
+	COUNT(address_id), 
+	COUNT(first_name), 
+	COUNT(last_name), 
+	COUNT(*) 
+FROM customer
+
+## Exploratory and Analysis
+
+-- Run numerical and non-numerical summary of the film table
+
+SELECT MIN(release_year) AS min_release_year,
+		MAX(release_year) AS max_release_year,
+		AVG(release_year) AS average_release_year,
+		MIN(rental_duration) AS min_rental_duration,
+		MAX(rental_duration) AS max_rental_duration,
+		AVG(rental_duration) AS average_rental_duration,
+		MIN(rental_rate) AS min_rental_rate,
+		MAX(rental_rate) AS max_rental_rate,
+		AVG(rental_rate) AS average_rental_rate,
+		MIN(length) AS min_length,
+		MAX(length) AS max_length,
+		AVG(length) AS average_length,
+		MIN(replacement_cost) AS min_replacement_cost,
+		MAX(replacement_cost) AS max_replacement_cost,
+		AVG(replacement_cost) AS average_replacement_cost
+FROM film
+
+SELECT mode() WITHIN GROUP (ORDER BY rating) AS rating_modal_value 
+FROM film
+
+-- Filter data to only show particular films in a MPAA rating, with edited column headers
+
+SELECT rating, 	
+	COUNT(film_id) AS count_of_movies, 
+	AVG(rental_rate) AS average_movie_rental_rate, 
+	MAX(rental_duration) AS maximum_rental_duration, 
+	MIN(rental_duration) AS minimum_rental_duration
+FROM film	
+WHERE rating IN ('PG','G')	
+GROUP BY rating	
+
+-- Join linked tables together for customer count rankings
+
+SELECT COUNT(customer_id) AS number_of_customers,
+	D.country
+FROM customer A
+INNER JOIN address B ON A.address_id = B.address_id
+INNER JOIN city C ON B.city_id = C.city_id
+INNER JOIN country D ON C.country_id = D.country_id
+GROUP BY country
+ORDER BY COUNT(customer_id) DESC
+LIMIT 10
+
+-- Identify highest expenditure by customer in Top 10 countries
+
+SELECT A.customer_id,
+	A.first_name,
+	A.last_name,
+	C.city,
+	D.country,
+	SUM(E.amount) AS total_paid
+FROM customer A
+INNER JOIN address B ON A.address_id = B.address_id
+INNER JOIN city C ON B.city_id = C.city_id
+INNER JOIN country D ON C.country_id = D.country_id
+INNER JOIN payment E ON A.customer_id = E.customer_id
+WHERE city IN ('Aurora','Tokat','Tarsus','Atlixco','Emeishan','Pontianak','Shimoga','Aparecida de Goinia','Zalantun','Taguig')
+GROUP BY A.customer_id, C.city, D.country
+ORDER BY total_paid DESC
+LIMIT 5
+
+-- Determine top 5 countries with highest paying customers and how many top customers reside in that country
+
+SELECT A.country, 
+	COUNT(DISTINCT D.customer_id) AS all_customer_count,
+	COUNT(DISTINCT top_5_customers) AS top_customer_count
+FROM country A
+INNER JOIN city B ON A.country_id = B.country_id
+INNER JOIN address C ON B.city_id = C.city_id
+INNER JOIN customer D ON C.address_id = D.address_id
+LEFT JOIN (SELECT A.customer_id,
+	A.first_name,
+	A.last_name,
+	C.city,
+	D.country,
+	SUM(E.amount) AS total_paid
+	FROM customer A
+	INNER JOIN address B ON A.address_id = B.address_id
+	INNER JOIN city C ON B.city_id = C.city_id
+	INNER JOIN country D ON C.country_id = D.country_id
+	INNER JOIN payment E ON A.customer_id = E.customer_id
+WHERE city IN ('Aurora','Tokat','Tarsus','Atlixco','Emeishan','Pontianak','Shimoga','Aparecida de Goinia','Zalantun','Taguig')
+	GROUP BY A.customer_id, C.city, D.country
+	ORDER BY total_paid DESC
+	LIMIT 5) AS top_5_customers ON A.country = top_5_customers.country
+GROUP BY A.country
+ORDER BY top_customer_count DESC
+LIMIT 5
+
+-- Querying the above script, now implementing the use of a CTE for cost efficiency
+
+WITH top_5_cte (customer_id, first_name, last_name, city, country, total_paid) AS
+	(SELECT A.customer_id,
+	A.first_name,
+	A.last_name,
+	C.city,
+	D.country,
+	SUM(E.amount) AS total_paid
+	FROM customer A
+	INNER JOIN address B ON A.address_id = B.address_id
+	INNER JOIN city C ON B.city_id = C.city_id
+	INNER JOIN country D ON C.country_id = D.country_id
+	INNER JOIN payment E ON A.customer_id = E.customer_id
+WHERE city IN ('Aurora','Tokat','Tarsus','Atlixco','Emeishan','Pontianak','Shimoga','Aparecida de Goinia','Zalantun','Taguig')
+	GROUP BY A.customer_id, C.city, D.country
+	ORDER BY total_paid DESC
+	LIMIT 5)
+SELECT A.country, 
+	COUNT(DISTINCT D.customer_id) AS all_customer_count,
+	COUNT(DISTINCT top_5_cte.country) AS top_customer_count
+FROM country A
+INNER JOIN city B ON A.country_id = B.country_id
+INNER JOIN address C ON B.city_id = C.city_id
+INNER JOIN customer D ON C.address_id = D.address_id
+LEFT JOIN top_5_cte ON A.country = top_5_cte.country
+GROUP BY A.country
+ORDER BY top_customer_count DESC
+LIMIT 5
